@@ -1,36 +1,13 @@
-from fastapi import FastAPI, Depends, status, Response, HTTPException
-from blog import schemas, models
-from blog.database import engine, SessionLocal
-from sqlalchemy.orm import Session
+from fastapi import FastAPI
+from blog import models
+from blog.database import engine, get_db
+from .routers import blog, user, authentication
 
 app = FastAPI()
 
 models.Base.metadata.create_all(engine)
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+app.include_router(authentication.router)
+app.include_router(blog.router)
+app.include_router(user.router)
 
-@app.post('/blog', status_code=status.HTTP_201_CREATED)
-def create(request: schemas.Blog, db : Session = Depends(get_db)):
-    new_blog = models.Blog(title=request.title, body=request.body)
-    db.add(new_blog)
-    db.commit()
-    db.refresh(new_blog)
-    return new_blog
-
-@app.get('/blog')
-def all_blogs(db : Session = Depends(get_db)):
-    blogs = db.query(models.Blog).all()
-    return blogs
-
-
-@app.get('/blog/{id}', status_code=200)
-def show_blog(blog_id, response: Response, db : Session = Depends(get_db)):
-    blog = db.query(models.Blog).filter(models.Blog.id == blog_id).first()
-    if not blog:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Blog {blog_id} not found")
-    return blog
